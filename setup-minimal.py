@@ -2,12 +2,8 @@ import setuptools
 
 REQUIRES = [
     'numpy',
-    'scenedetect[opencv]',
-    'opencv-python',
-    'tqdm',
     'psutil',
     'scipy',
-    'matplotlib',
 ]
 
 with open("README.md", "r") as f:
@@ -16,7 +12,7 @@ with open("README.md", "r") as f:
 version = "6"
 
 setuptools.setup(
-    name="Av1an",
+    name="Av1an-minimal",
     version=version,
     author="Master_Of_Zen",
     author_email="master_of_zen@protonmail.com",

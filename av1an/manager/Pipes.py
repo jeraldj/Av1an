@@ -1,9 +1,9 @@
-import sys
 from collections import deque
 
 from av1an.chunk import Chunk
 from av1an.encoder import ENCODERS
 from av1an.project import Project
+from av1an.logger import log
 
 
 def process_pipe(pipe, chunk: Chunk):
@@ -18,9 +18,11 @@ def process_pipe(pipe, chunk: Chunk):
             encoder_history.append(line)
 
     if pipe.returncode != 0 and pipe.returncode != -2:
-        print(f"\n:: Encoder encountered an error: {pipe.returncode}")
-        print(f"\n:: Chunk: {chunk.index}")
-        print('\n'.join(encoder_history))
+        msg = f':: Encoder encountered an error: {pipe.returncode}\n:: Chunk: {chunk.index}' + \
+             '\n'.join(encoder_history)
+        log(msg + '\n\n')
+        print(msg)
+        raise Exception("Error in processing pipe")
 
 
 def process_encoding_pipe(pipe, encoder, counter, chunk: Chunk):
@@ -48,26 +50,22 @@ def process_encoding_pipe(pipe, encoder, counter, chunk: Chunk):
             encoder_history.append(line)
 
     if pipe.returncode != 0 and pipe.returncode != -2:  # -2 is Ctrl+C for aom
+        msg = f':: Encoder encountered an error: {pipe.returncode}\n:: Chunk: {chunk.index}\n' + \
+             '\n'.join(encoder_history)
+        log(msg + '\n\n')
+        print(msg)
+        raise Exception("Error in processing encoding pipe")
 
-        print(f"\n:: Encoder encountered an error: {pipe.returncode}")
-        print(f"\n:: Chunk: {chunk.index}")
-        print('\n'.join(encoder_history))
 
+def tqdm_bar(a: Project, c: Chunk, encoder, counter, frame_probe_source,
+             passes, current_pass):
+    enc = ENCODERS[encoder]
+    pipe = enc.make_pipes(a, c, passes, current_pass, c.output)
 
-def tqdm_bar(a: Project, c: Chunk, encoder, counter, frame_probe_source, passes, current_pass):
-    try:
+    if encoder in ('aom', 'vpx', 'rav1e', 'x265', 'x264', 'vvc', 'svt_av1'):
+        process_encoding_pipe(pipe, encoder, counter, c)
 
-        enc = ENCODERS[encoder]
-        pipe = enc.make_pipes(a, c, passes, current_pass, c.output)
-
-        if encoder in ('aom', 'vpx', 'rav1e', 'x265', 'x264', 'vvc', 'svt_av1'):
-            process_encoding_pipe(pipe, encoder, counter, c)
-
-        if encoder in ('svt_vp9'):
-            # SVT-VP9 is special
-            process_pipe(pipe, c)
-            counter.update(frame_probe_source // passes)
-
-    except Exception as e:
-        _, _, exc_tb = sys.exc_info()
-        print(f'\n:: Error at encode {e}\nAt line {exc_tb.tb_lineno}')
+    if encoder in ('svt_vp9'):
+        # SVT-VP9 is special
+        process_pipe(pipe, c)
+        counter.update(frame_probe_source // passes)

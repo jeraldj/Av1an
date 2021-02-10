@@ -8,11 +8,14 @@ from pathlib import Path
 from subprocess import PIPE, STDOUT
 
 import cv2
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
 
 from av1an.commandtypes import CommandPair
 from av1an.logger import log
-from av1an.utils import terminate, frame_probe, frame_probe_fast
+from av1an.utils import terminate, frame_probe_fast
 from av1an.vapoursynth import compose_vapoursynth_pipe
 
 # This is a script that returns a list of keyframes that aom would likely place. Port of aom's C code.
@@ -26,7 +29,7 @@ from av1an.vapoursynth import compose_vapoursynth_pipe
 
 
 # default params for 1st pass when aom isn't the final encoder and -v won't match aom's options
-AOM_KEYFRAMES_DEFAULT_PARAMS = ['--threads=12', '--cpu-used=0' ,'--end-usage=q', '--tile-columns=3', '--tile-rows=2', '--cq-level=40']
+AOM_KEYFRAMES_DEFAULT_PARAMS = ['--threads=64', '--cpu-used=6' ,'--end-usage=q', '--tile-columns=2', '--tile-rows=1', '--cq-level=40']
 
 
 # Fields meanings: <source root>/av1/encoder/firstpass.h
@@ -179,7 +182,7 @@ def compose_aomsplit_first_pass_command(video_path: Path, stat_file: Path, ffmpe
     return CommandPair(f, e)
 
 
-def aom_keyframes(video_path: Path, stat_file, min_scene_len, ffmpeg_pipe, video_params, is_vs):
+def aom_keyframes(video_path: Path, stat_file, min_scene_len, ffmpeg_pipe, video_params, is_vs, quiet):
     """[Get frame numbers for splits from aomenc 1 pass stat file]
     """
 
@@ -189,7 +192,9 @@ def aom_keyframes(video_path: Path, stat_file, min_scene_len, ffmpeg_pipe, video
 
     f, e = compose_aomsplit_first_pass_command(video_path, stat_file, ffmpeg_pipe, video_params, is_vs)
 
-    tqdm_bar = tqdm(total=total, initial=0, dynamic_ncols=True, unit="fr", leave=True, smoothing=0.2)
+    tqdm_bar = None
+    if (not quiet) and (not (tqdm is None)):
+        tqdm_bar = tqdm(total=total, initial=0, dynamic_ncols=True, unit="fr", leave=True, smoothing=0.2)
 
     ffmpeg_pipe = subprocess.Popen(f, stdout=PIPE, stderr=STDOUT)
     pipe = subprocess.Popen(e, stdin=ffmpeg_pipe.stdout, stdout=PIPE,
@@ -206,6 +211,9 @@ def aom_keyframes(video_path: Path, stat_file, min_scene_len, ffmpeg_pipe, video
 
         if line:
             encoder_history.append(line)
+
+        if quiet or (tqdm is None):
+            continue
 
         match = re.search(r"frame.*?/([^ ]+?) ", line)
         if match:

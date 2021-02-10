@@ -1,10 +1,15 @@
-### 2
-- Target VMAF renamed to Target Quality
-- Changed Algo for Target Quality score calculation
+### 6
+- ~1.7x faster probes for svt-av1
+- ~2x faster probes for aomenc
 
-### 3
-- Default pix format to be yuv420p10le
-- Default scene change interval to be 120 frames
+### 5
+- Fixed fatal errors with ffms2/lsmash
+- Added vmaf validation on each time when VMAF initialized
+- Fix running not required frame probe
+- Chunk restarting
+- Fixed ffmpeg segmenting
+- `color_range 0` by default for pipes
+- aomenc target quality probes to be 8 bit
 
 ### 4
 - Refactored Args to Project class
@@ -28,6 +33,10 @@
 - Changed Target Quality probing rate
 - Refactored module structure/names
 
-### 5
-- Added vmaf validation on each time when VMAF initialized
-- Fix running not required frame probe
+### 3
+- Default pix format to be yuv420p10le
+- Default scene change interval to be 120 frames
+
+### 2
+- Target VMAF renamed to Target Quality
+- Changed Algo for Target Quality score calculation

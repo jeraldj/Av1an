@@ -3,10 +3,13 @@
 import sys
 from subprocess import Popen
 
-from scenedetect.detectors import ContentDetector
-from scenedetect.scene_manager import SceneManager
-from scenedetect.video_manager import VideoManager
-from scenedetect.frame_timecode import FrameTimecode
+try:
+    from scenedetect.detectors import ContentDetector
+    from scenedetect.scene_manager import SceneManager
+    from scenedetect.video_manager import VideoManager
+    from scenedetect.frame_timecode import FrameTimecode
+except ImportError:
+    ContentDetector = None
 
 from av1an.logger import log
 from av1an.utils import frame_probe
@@ -16,7 +19,7 @@ if sys.platform == "linux":
     from os import mkfifo
 
 
-def pyscene(video, threshold, min_scene_len, is_vs, temp):
+def pyscene(video, threshold, min_scene_len, is_vs, temp, quiet):
     """
     Running PySceneDetect detection on source video for segmenting.
     Optimal threshold settings 15-50
@@ -24,7 +27,13 @@ def pyscene(video, threshold, min_scene_len, is_vs, temp):
     if not min_scene_len:
         min_scene_len = 15
 
-    log(f'Starting PySceneDetect:\nThreshold: {threshold}, Min scene length: {min_scene_len}\n Is Vapoursynth input: {is_vs}\n')
+    if ContentDetector is None:
+        log(f'Unable to start PySceneDetect because it was not found. Please install scenedetect[opencv] to use'
+            )
+        return []
+
+    log(f'Starting PySceneDetect:\nThreshold: {threshold}, Min scene length: {min_scene_len}\n Is Vapoursynth input: {is_vs}\n'
+        )
 
     if is_vs:
         # Handling vapoursynth, so we need to create a named pipe to feed to VideoManager.
@@ -46,10 +55,12 @@ def pyscene(video, threshold, min_scene_len, is_vs, temp):
 
     video_manager = VideoManager([str(vspipe_fifo if is_vs else video)])
     scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(threshold=threshold, min_scene_len=min_scene_len))
+    scene_manager.add_detector(
+        ContentDetector(threshold=threshold, min_scene_len=min_scene_len))
     base_timecode = video_manager.get_base_timecode()
 
-    video_manager.set_duration(duration=FrameTimecode(frames, video_manager.get_framerate()) if is_vs else None)
+    video_manager.set_duration(duration=FrameTimecode(
+        frames, video_manager.get_framerate()) if is_vs else None)
 
     # Set downscale factor to improve processing speed.
     video_manager.set_downscale_factor()
@@ -57,7 +68,8 @@ def pyscene(video, threshold, min_scene_len, is_vs, temp):
     # Start video_manager.
     video_manager.start()
 
-    scene_manager.detect_scenes(frame_source=video_manager, show_progress=True)
+    scene_manager.detect_scenes(frame_source=video_manager,
+                                show_progress=(not quiet))
 
     # If fed using a vspipe process, ensure that vspipe has finished.
     if is_vs:
